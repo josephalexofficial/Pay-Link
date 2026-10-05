@@ -17,7 +17,6 @@ type PaymentView = {
 };
 
 type FieldErrors = {
-  customerName?: string;
   phoneNumber?: string;
   amountInKes?: string;
 };
@@ -26,7 +25,6 @@ const FIELD_CLASS_NAME =
   "h-14 w-full rounded-xl border border-line bg-white px-4 text-base text-foreground outline-none transition duration-300 placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/10";
 
 export function PayForm() {
-  const [customerName, setCustomerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [amountText, setAmountText] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -82,10 +80,8 @@ export function PayForm() {
     setFieldErrors({});
 
     const amountInKes = Number(amountText);
-    const trimmedName = customerName.trim();
-    if (!trimmedName || !phoneNumber.trim() || !Number.isFinite(amountInKes) || amountInKes <= 0) {
+    if (!phoneNumber.trim() || !Number.isFinite(amountInKes) || amountInKes <= 0) {
       setFieldErrors({
-        customerName: trimmedName ? undefined : "Enter the name of the person paying.",
         phoneNumber: phoneNumber.trim() ? undefined : "Enter a Safaricom number, for example 0712 345 678.",
         amountInKes: Number.isFinite(amountInKes) && amountInKes > 0 ? undefined : "Enter an amount from KES 1.",
       });
@@ -95,7 +91,7 @@ export function PayForm() {
     setIsSubmitting(true);
 
     try {
-      const created = await createPayment(trimmedName, phoneNumber, amountInKes);
+      const created = await createPayment(phoneNumber, amountInKes);
       setPayment(created);
       setIsPastWait(false);
     } catch (error) {
@@ -146,24 +142,9 @@ export function PayForm() {
       ) : (
         <form onSubmit={(event) => void handleSubmit(event)} noValidate>
           <h1 className="text-[1.7rem] font-semibold tracking-tight">Pay with M-Pesa</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">Enter the name and Safaricom number that should receive the prompt.</p>
+          <p className="mt-2 text-sm leading-6 text-muted">Enter the Safaricom number that should receive the prompt.</p>
 
-          <label className="mt-7 block text-sm font-medium" htmlFor="customer-name">
-            Name
-          </label>
-          <input
-            id="customer-name"
-            name="customerName"
-            type="text"
-            autoComplete="name"
-            placeholder="Jane Wanjiku"
-            value={customerName}
-            onChange={(event) => setCustomerName(event.target.value)}
-            className={`mt-2 ${FIELD_CLASS_NAME}`}
-          />
-          {fieldErrors.customerName ? <p className="mt-2 text-sm text-danger">{fieldErrors.customerName}</p> : null}
-
-          <label className="mt-5 block text-sm font-medium" htmlFor="phone-number">
+          <label className="mt-7 block text-sm font-medium" htmlFor="phone-number">
             M-Pesa number
           </label>
           <input
@@ -197,7 +178,7 @@ export function PayForm() {
           </div>
           {fieldErrors.amountInKes ? <p className="mt-2 text-sm text-danger">{fieldErrors.amountInKes}</p> : null}
 
-          {formError && !fieldErrors.customerName && !fieldErrors.phoneNumber && !fieldErrors.amountInKes ? (
+          {formError && !fieldErrors.phoneNumber && !fieldErrors.amountInKes ? (
             <p className="mt-4 text-sm leading-6 text-danger">{formError}</p>
           ) : null}
 
@@ -327,14 +308,14 @@ class PaymentRequestError extends Error {
   }
 }
 
-async function createPayment(customerName: string, phoneNumber: string, amountInKes: number): Promise<PaymentView> {
+async function createPayment(phoneNumber: string, amountInKes: number): Promise<PaymentView> {
   let response: Response;
 
   try {
     response = await fetch("/api/v1/payments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ customerName, phoneNumber, amountInKes }),
+      body: JSON.stringify({ phoneNumber, amountInKes }),
       signal: AbortSignal.timeout(20_000),
     });
   } catch {
@@ -442,10 +423,6 @@ function readFieldErrors(body: unknown): FieldErrors {
   for (const detail of body.error.details) {
     if (!detail || typeof detail !== "object" || !("field" in detail) || !("issue" in detail)) {
       continue;
-    }
-
-    if (detail.field === "customerName" && typeof detail.issue === "string") {
-      fieldErrors.customerName = detail.issue;
     }
 
     if (detail.field === "phoneNumber" && typeof detail.issue === "string") {

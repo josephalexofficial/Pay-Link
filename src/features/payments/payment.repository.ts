@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, isNotNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { normalizeKenyanPhone } from "@/common/utils/phone";
 import { getDatabase } from "@/db/client";
@@ -10,7 +10,6 @@ export type NewPayment = {
   merchantRequestId: string;
   checkoutRequestId: string;
   phoneNumber: string;
-  customerName: string;
   amountInKes: number;
   accountReference: string;
   transactionDescription: string;
@@ -24,6 +23,7 @@ export type PaymentPatch = {
   paidAt?: Date | null;
   rawCallback?: unknown;
   lastQueriedAt?: Date | null;
+  customerName?: string | null;
 };
 
 export type PaymentListQuery = {
@@ -70,6 +70,50 @@ export async function findPaymentByCheckoutRequestId(checkoutRequestId: string):
     .select()
     .from(payments)
     .where(eq(payments.checkoutRequestId, checkoutRequestId))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
+ * Loads one payment by the M-Pesa receipt.
+ *
+ * @param receiptNumber - MpesaReceiptNumber from a completed payment.
+ * @returns The payment, or null when no row has that receipt yet.
+ */
+export async function findPaymentByReceiptNumber(receiptNumber: string): Promise<PaymentRecord | null> {
+  const database = getDatabase();
+  const rows = await database.select().from(payments).where(eq(payments.mpesaReceiptNumber, receiptNumber)).limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
+ * Loads the newest matching payment that does not have a payer name yet.
+ *
+ * @param phoneNumber - Normalized 254 number.
+ * @param amountInKes - Whole shillings.
+ * @param createdAfter - Oldest prompt that can still be the same payment.
+ * @returns The payment, or null when nothing matches.
+ */
+export async function findLatestUnnamedPayment(
+  phoneNumber: string,
+  amountInKes: number,
+  createdAfter: Date,
+): Promise<PaymentRecord | null> {
+  const database = getDatabase();
+  const rows = await database
+    .select()
+    .from(payments)
+    .where(
+      and(
+        eq(payments.phoneNumber, phoneNumber),
+        eq(payments.amountInKes, amountInKes),
+        gte(payments.createdAt, createdAfter),
+        isNull(payments.customerName),
+      ),
+    )
+    .orderBy(desc(payments.createdAt))
     .limit(1);
 
   return rows[0] ?? null;

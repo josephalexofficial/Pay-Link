@@ -1,5 +1,6 @@
 import { ConflictError, ExternalServiceError, RateLimitError } from "@/common/errors/app-error";
 import { logger } from "@/common/logging/logger";
+import { normalizeKenyanPhone } from "@/common/utils/phone";
 import type { PaymentRecord } from "@/db/schema";
 
 import {
@@ -14,13 +15,17 @@ import {
 import { queryStkPush, sendStkPush } from "./mpesa.service";
 import {
   countPaymentsForPhoneSince,
+  findLatestUnnamedPayment,
   findPaymentByCheckoutRequestId,
+  findPaymentByReceiptNumber,
   findPendingPaymentForPhone,
   findPendingPaymentsWithCallbacks,
   insertPayment,
   updatePaymentByCheckoutRequestId,
 } from "./payment.repository";
-import { paymentStatusSchema, stkCallbackSchema, type StkCallbackPayload } from "./payment.schema";
+import { paymentStatusSchema, stkCallbackSchema, type PayerConfirmation, type StkCallbackPayload } from "./payment.schema";
+
+const NAME_MATCH_WINDOW_IN_MS = 30 * 60_000;
 
 type CallbackDecision = {
   status: PaymentStatus;
@@ -32,7 +37,6 @@ type CallbackDecision = {
 export type PaymentView = {
   checkoutRequestId: string;
   phoneNumber: string;
-  customerName: string | null;
   amountInKes: number;
   status: PaymentStatus;
   resultDescription: string | null;
@@ -43,7 +47,7 @@ export type PaymentView = {
 /**
  * Sends an STK prompt, or returns the prompt already waiting on that phone.
  *
- * @param input - Payer name, normalized Safaricom number, and whole-shilling amount.
+ * @param input - Normalized Safaricom number and whole-shilling amount.
  * @param now - Instant used for rate limits and the Daraja timestamp.
  * @returns The pending payment the page should watch.
  *
@@ -53,7 +57,7 @@ export type PaymentView = {
  * @throws {ConfigurationError} When credentials or the database are not configured.
  */
 export async function requestPayment(
-  input: { customerName: string; phoneNumber: string; amountInKes: number },
+  input: { phoneNumber: string; amountInKes: number },
   now: Date,
 ): Promise<PaymentView> {
   const windowStart = new Date(now.getTime() - PROMPT_WINDOW_IN_MS);
@@ -85,7 +89,6 @@ export async function requestPayment(
       merchantRequestId: accepted.merchantRequestId,
       checkoutRequestId: accepted.checkoutRequestId,
       phoneNumber: input.phoneNumber,
-      customerName: input.customerName,
       amountInKes: input.amountInKes,
       accountReference: ACCOUNT_REFERENCE,
       transactionDescription: TRANSACTION_DESCRIPTION,
@@ -99,6 +102,46 @@ export async function requestPayment(
     });
     throw new ExternalServiceError("The prompt was sent. Check your phone before trying again.");
   }
+}
+
+/**
+ * Saves the M-Pesa registered name onto the matching payment.
+ * The pay page never asks for this name. Safaricom sends it after the money moves.
+ *
+ * @param confirmation - First, middle, and last name plus the receipt or phone Safaricom included.
+ * @returns Nothing. A confirmation that cannot be matched is ignored.
+ */
+export async function recordPayerName(confirmation: PayerConfirmation): Promise<void> {
+  const name = joinPayerName(confirmation.FirstName, confirmation.MiddleName, confirmation.LastName);
+  if (!name) {
+    return;
+  }
+
+  const receipt = confirmation.TransID?.trim();
+  const byReceipt = receipt ? await findPaymentByReceiptNumber(receipt) : null;
+  if (byReceipt) {
+    if (!byReceipt.customerName) {
+      await updatePaymentByCheckoutRequestId(byReceipt.checkoutRequestId, { customerName: name });
+    }
+    return;
+  }
+
+  const phoneValue = confirmation.MSISDN === undefined ? null : String(confirmation.MSISDN);
+  const phoneNumber = phoneValue ? normalizeKenyanPhone(phoneValue) : null;
+  const amountInKes = wholeShillings(confirmation.TransAmount);
+  if (!phoneNumber || amountInKes === null) {
+    logger.warn("Payer name could not be matched to a payment", { receipt: receipt ?? null });
+    return;
+  }
+
+  const createdAfter = new Date(Date.now() - NAME_MATCH_WINDOW_IN_MS);
+  const match = await findLatestUnnamedPayment(phoneNumber, amountInKes, createdAfter);
+  if (!match) {
+    logger.warn("Payer name could not be matched to a payment", { receipt: receipt ?? null });
+    return;
+  }
+
+  await updatePaymentByCheckoutRequestId(match.checkoutRequestId, { customerName: name });
 }
 
 /**
@@ -335,13 +378,34 @@ function readReceiptFromCallback(raw: unknown): string | null {
   return null;
 }
 
+function joinPayerName(firstName?: string, middleName?: string, lastName?: string): string | null {
+  const name = [firstName, middleName, lastName]
+    .map((part) => part?.trim() ?? "")
+    .filter((part) => part.length > 0)
+    .join(" ");
+
+  return name.length > 0 ? name.slice(0, 80) : null;
+}
+
+function wholeShillings(value: string | number | undefined): number | null {
+  if (value === undefined) {
+    return null;
+  }
+
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  return Math.round(amount);
+}
+
 function toPaymentView(payment: PaymentRecord): PaymentView {
   const parsedStatus = paymentStatusSchema.safeParse(payment.status);
 
   return {
     checkoutRequestId: payment.checkoutRequestId,
     phoneNumber: payment.phoneNumber,
-    customerName: payment.customerName,
     amountInKes: payment.amountInKes,
     status: parsedStatus.success ? parsedStatus.data : "failed",
     resultDescription: payment.resultDescription,

@@ -8,15 +8,14 @@ export const maxDuration = 30;
 
 /**
  * @route   POST /api/v1/payments
- * @desc    Sends an M-Pesa STK prompt for a payer name, Safaricom number, and amount.
+ * @desc    Sends an M-Pesa STK prompt for a Safaricom number and amount.
  * @access  Public.
  *
- * @param   {string} body.customerName - Name of the person paying.
  * @param   {string} body.phoneNumber - Safaricom number, for example 0712345678.
  * @param   {number} body.amountInKes - Whole shillings from 1 to 150000.
  *
  * @returns {200} Prompt accepted, or an identical prompt is already waiting on that phone.
- * @returns {400} Name, phone number, or amount failed validation.
+ * @returns {400} Phone number or amount failed validation.
  * @returns {409} A different amount is already waiting on that phone.
  * @returns {429} Too many prompts were sent to that number.
  * @returns {502} Daraja could not send the prompt.

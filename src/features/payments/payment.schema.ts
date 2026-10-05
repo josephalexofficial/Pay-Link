@@ -5,14 +5,7 @@ import { normalizeKenyanPhone } from "@/common/utils/phone";
 
 import { MAXIMUM_AMOUNT_IN_KES, MINIMUM_AMOUNT_IN_KES, PAYMENT_STATUSES } from "./payment.constants";
 
-const CUSTOMER_NAME_PATTERN = /^(?=.{2,60}$)[\p{L}][\p{L} .'-]*$/u;
-
 export const createPaymentSchema = z.object({
-  customerName: z
-    .string()
-    .trim()
-    .min(1, "Enter the name of the person paying.")
-    .regex(CUSTOMER_NAME_PATTERN, "Enter the name of the person paying, using letters only."),
   phoneNumber: z
     .string()
     .trim()
@@ -62,18 +55,40 @@ export const stkCallbackSchema = z.object({
 
 export type StkCallbackPayload = z.infer<typeof stkCallbackSchema>;
 
+export const payerConfirmationSchema = z.object({
+  TransID: z.string().trim().min(1).optional(),
+  TransAmount: z.union([z.string(), z.number()]).optional(),
+  MSISDN: z.union([z.string(), z.number()]).optional(),
+  FirstName: z.string().optional(),
+  MiddleName: z.string().optional(),
+  LastName: z.string().optional(),
+});
+
+export type PayerConfirmation = z.infer<typeof payerConfirmationSchema>;
+
+/**
+ * Reads the payer name Safaricom posts after money has moved.
+ *
+ * @param payload - Raw confirmation JSON.
+ * @returns The typed confirmation, or null when the body is not a confirmation.
+ */
+export function parsePayerConfirmation(payload: unknown): PayerConfirmation | null {
+  const parsed = payerConfirmationSchema.safeParse(payload);
+  return parsed.success ? parsed.data : null;
+}
+
 /**
  * Parses an unknown JSON body into a payment request.
  *
  * @param payload - Raw request JSON.
- * @returns The payer name, normalized phone number, and whole-shilling amount.
+ * @returns The normalized phone number and whole-shilling amount.
  *
- * @throws {ValidationError} When the name, phone, or amount is not acceptable.
+ * @throws {ValidationError} When the phone or amount is not acceptable.
  */
 export function parseCreatePayment(payload: unknown): CreatePaymentInput {
   const parsed = createPaymentSchema.safeParse(payload);
   if (!parsed.success) {
-    throw validationErrorFromZod(parsed.error, "Check the name, phone number, and amount.");
+    throw validationErrorFromZod(parsed.error);
   }
 
   return parsed.data;
