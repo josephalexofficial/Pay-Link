@@ -4,9 +4,9 @@
 
 ## 1. System Overview and Key Capabilities
 
-- **Pay page:** One screen collects a Safaricom phone number and an amount in Kenyan shillings, then sends an STK prompt.
+- **Pay page:** One screen collects the payer's name, a Safaricom phone number, and an amount in Kenyan shillings, then sends an STK prompt.
 - **Result tracking:** Safaricom's callback marks the payment paid and stores the receipt. If that callback is late, the server asks Daraja with an STK query.
-- **Admin:** One signed-in user sees every prompt, the full phone number, the amount, the status, and the M-Pesa receipt.
+- **Admin:** One signed-in user sees every prompt, the payer's name, the full phone number, the amount, the status, and the M-Pesa receipt.
 
 ## 2. Architecture and Data Flow
 

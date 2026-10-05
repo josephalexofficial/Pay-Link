@@ -10,6 +10,7 @@ export type NewPayment = {
   merchantRequestId: string;
   checkoutRequestId: string;
   phoneNumber: string;
+  customerName: string;
   amountInKes: number;
   accountReference: string;
   transactionDescription: string;
@@ -222,6 +223,7 @@ function buildListFilters(query: PaymentListQuery) {
     const normalizedPhone = normalizeKenyanPhone(searchText);
     const phoneMatch = normalizedPhone ? eq(payments.phoneNumber, normalizedPhone) : undefined;
     const looseMatch = or(
+      ilike(payments.customerName, `%${searchText}%`),
       ilike(payments.phoneNumber, `%${searchText}%`),
       ilike(payments.mpesaReceiptNumber, `%${searchText}%`),
     );

@@ -32,6 +32,7 @@ type CallbackDecision = {
 export type PaymentView = {
   checkoutRequestId: string;
   phoneNumber: string;
+  customerName: string | null;
   amountInKes: number;
   status: PaymentStatus;
   resultDescription: string | null;
@@ -42,7 +43,7 @@ export type PaymentView = {
 /**
  * Sends an STK prompt, or returns the prompt already waiting on that phone.
  *
- * @param input - Normalized Safaricom number and whole-shilling amount.
+ * @param input - Payer name, normalized Safaricom number, and whole-shilling amount.
  * @param now - Instant used for rate limits and the Daraja timestamp.
  * @returns The pending payment the page should watch.
  *
@@ -52,7 +53,7 @@ export type PaymentView = {
  * @throws {ConfigurationError} When credentials or the database are not configured.
  */
 export async function requestPayment(
-  input: { phoneNumber: string; amountInKes: number },
+  input: { customerName: string; phoneNumber: string; amountInKes: number },
   now: Date,
 ): Promise<PaymentView> {
   const windowStart = new Date(now.getTime() - PROMPT_WINDOW_IN_MS);
@@ -84,6 +85,7 @@ export async function requestPayment(
       merchantRequestId: accepted.merchantRequestId,
       checkoutRequestId: accepted.checkoutRequestId,
       phoneNumber: input.phoneNumber,
+      customerName: input.customerName,
       amountInKes: input.amountInKes,
       accountReference: ACCOUNT_REFERENCE,
       transactionDescription: TRANSACTION_DESCRIPTION,
@@ -339,6 +341,7 @@ function toPaymentView(payment: PaymentRecord): PaymentView {
   return {
     checkoutRequestId: payment.checkoutRequestId,
     phoneNumber: payment.phoneNumber,
+    customerName: payment.customerName,
     amountInKes: payment.amountInKes,
     status: parsedStatus.success ? parsedStatus.data : "failed",
     resultDescription: payment.resultDescription,

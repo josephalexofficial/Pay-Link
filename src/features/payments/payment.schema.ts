@@ -5,7 +5,14 @@ import { normalizeKenyanPhone } from "@/common/utils/phone";
 
 import { MAXIMUM_AMOUNT_IN_KES, MINIMUM_AMOUNT_IN_KES, PAYMENT_STATUSES } from "./payment.constants";
 
+const CUSTOMER_NAME_PATTERN = /^(?=.{2,60}$)[\p{L}][\p{L} .'-]*$/u;
+
 export const createPaymentSchema = z.object({
+  customerName: z
+    .string()
+    .trim()
+    .min(1, "Enter the name of the person paying.")
+    .regex(CUSTOMER_NAME_PATTERN, "Enter the name of the person paying, using letters only."),
   phoneNumber: z
     .string()
     .trim()
@@ -59,14 +66,14 @@ export type StkCallbackPayload = z.infer<typeof stkCallbackSchema>;
  * Parses an unknown JSON body into a payment request.
  *
  * @param payload - Raw request JSON.
- * @returns The normalized phone number and whole-shilling amount.
+ * @returns The payer name, normalized phone number, and whole-shilling amount.
  *
- * @throws {ValidationError} When the phone or amount is not acceptable.
+ * @throws {ValidationError} When the name, phone, or amount is not acceptable.
  */
 export function parseCreatePayment(payload: unknown): CreatePaymentInput {
   const parsed = createPaymentSchema.safeParse(payload);
   if (!parsed.success) {
-    throw validationErrorFromZod(parsed.error);
+    throw validationErrorFromZod(parsed.error, "Check the name, phone number, and amount.");
   }
 
   return parsed.data;
@@ -89,8 +96,8 @@ export function parseStkCallback(payload: unknown): StkCallbackPayload {
   return parsed.data;
 }
 
-export function validationErrorFromZod(error: z.ZodError): ValidationError {
-  return new ValidationError("Check the phone number and amount.", {
+export function validationErrorFromZod(error: z.ZodError, message = "Check the phone number and amount."): ValidationError {
+  return new ValidationError(message, {
     details: error.issues.map((issue) => ({
       field: issue.path.join(".") || "request",
       issue: issue.message,

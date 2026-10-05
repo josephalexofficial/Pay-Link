@@ -9,6 +9,7 @@
 
 ### Added
 
+- The pay page asks for the payer's name, and the admin dashboard shows that name beside each payment.
 - Pay page that sends an M-Pesa STK prompt for a Safaricom number and amount.
 - Callback receiver and STK query fallback that record paid, cancelled, timed out, and failed results.
 - Admin sign-in and dashboard for every payment, including the full phone number and M-Pesa receipt.
