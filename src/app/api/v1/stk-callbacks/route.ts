@@ -11,7 +11,7 @@ export const maxDuration = 30;
  * @route   POST /api/v1/stk-callbacks
  * @desc    Receives the STK result Safaricom posts after the customer acts on the prompt.
  *          The response uses Daraja's acknowledgement shape so Safaricom stops retrying.
- *          Payment status is confirmed afterwards with an STK query.
+ *          A final callback updates the payment. An STK query is only the fallback when no callback has arrived.
  * @access  Public. Called by Safaricom, not by the pay page.
  *
  * @returns {200} Callback stored or ignored. Body is { ResultCode: 0, ResultDesc: "Accepted" }.
@@ -31,7 +31,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const callback = parseStkCallback(payload);
-    await recordStkCallback(callback);
+    await recordStkCallback(callback, new Date());
     const checkoutRequestId = callback.Body.stkCallback.CheckoutRequestID;
 
     after(async () => {

@@ -16,10 +16,18 @@ import {
   countPaymentsForPhoneSince,
   findPaymentByCheckoutRequestId,
   findPendingPaymentForPhone,
+  findPendingPaymentsWithCallbacks,
   insertPayment,
   updatePaymentByCheckoutRequestId,
 } from "./payment.repository";
-import { paymentStatusSchema, type StkCallbackPayload } from "./payment.schema";
+import { paymentStatusSchema, stkCallbackSchema, type StkCallbackPayload } from "./payment.schema";
+
+type CallbackDecision = {
+  status: PaymentStatus;
+  resultCode: string;
+  resultDescription: string;
+  receipt: string | null;
+};
 
 export type PaymentView = {
   checkoutRequestId: string;
@@ -92,13 +100,14 @@ export async function requestPayment(
 }
 
 /**
- * Stores Safaricom's callback without treating it as proof of payment.
- * The receipt stays inside the raw payload until an STK query confirms the result.
+ * Stores Safaricom's callback and, when the prompt is still waiting, uses that result.
+ * The callback is the payment result. The M-Pesa receipt is only present here.
  *
  * @param payload - Validated STK callback body.
+ * @param now - Instant recorded as the paid time when the callback says the payment succeeded.
  * @returns Nothing. Unknown tickets are ignored so retries still receive an acknowledgement.
  */
-export async function recordStkCallback(payload: StkCallbackPayload): Promise<void> {
+export async function recordStkCallback(payload: StkCallbackPayload, now: Date): Promise<void> {
   const callback = payload.Body.stkCallback;
   const existing = await findPaymentByCheckoutRequestId(callback.CheckoutRequestID);
 
@@ -109,9 +118,38 @@ export async function recordStkCallback(payload: StkCallbackPayload): Promise<vo
     return;
   }
 
+  const decision = decisionFromCallback(payload);
+  const shouldSettle = existing.status === "pending";
+  const shouldStoreReceipt = existing.status === "paid" && !existing.mpesaReceiptNumber && decision.receipt !== null;
+
   await updatePaymentByCheckoutRequestId(callback.CheckoutRequestID, {
     rawCallback: payload,
+    ...(shouldSettle
+      ? {
+          status: decision.status,
+          resultCode: decision.resultCode,
+          resultDescription: decision.resultDescription,
+          mpesaReceiptNumber: decision.receipt,
+          paidAt: decision.status === "paid" ? now : null,
+        }
+      : {}),
+    ...(shouldStoreReceipt ? { mpesaReceiptNumber: decision.receipt } : {}),
   });
+}
+
+/**
+ * Marks pending payments paid, cancelled, timed out, or failed from callbacks already saved.
+ * Used when a callback arrived before this confirmation behavior was deployed.
+ *
+ * @param now - Instant recorded as the paid time for callbacks that succeeded.
+ * @returns Nothing.
+ */
+export async function settlePendingCallbacks(now: Date): Promise<void> {
+  const pending = await findPendingPaymentsWithCallbacks();
+
+  for (const payment of pending) {
+    await applyStoredCallback(payment, now);
+  }
 }
 
 /**
@@ -136,6 +174,11 @@ export async function reconcilePayment(
 
   if (existing.status !== "pending") {
     return toPaymentView(existing);
+  }
+
+  const settled = await applyStoredCallback(existing, now);
+  if (settled) {
+    return toPaymentView(settled);
   }
 
   if (!shouldQuery(existing, now, forceQuery)) {
@@ -201,6 +244,60 @@ function shouldQuery(payment: PaymentRecord, now: Date, forceQuery: boolean): bo
 
   const ageInMs = now.getTime() - payment.createdAt.getTime();
   return ageInMs >= QUERY_INTERVAL_IN_MS && sinceLastQueryInMs >= QUERY_INTERVAL_IN_MS;
+}
+
+async function applyStoredCallback(payment: PaymentRecord, now: Date): Promise<PaymentRecord | null> {
+  const decision = decisionFromStoredCallback(payment.rawCallback);
+  if (!decision) {
+    return null;
+  }
+
+  return updatePaymentByCheckoutRequestId(payment.checkoutRequestId, {
+    status: decision.status,
+    resultCode: decision.resultCode,
+    resultDescription: decision.resultDescription,
+    mpesaReceiptNumber: decision.receipt,
+    paidAt: decision.status === "paid" ? now : null,
+  });
+}
+
+function decisionFromStoredCallback(raw: unknown): CallbackDecision | null {
+  const parsed = stkCallbackSchema.safeParse(raw);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return decisionFromCallback(parsed.data);
+}
+
+function decisionFromCallback(payload: StkCallbackPayload): CallbackDecision {
+  const callback = payload.Body.stkCallback;
+  const status = statusFromResultCode(String(callback.ResultCode));
+
+  return {
+    status,
+    resultCode: String(callback.ResultCode),
+    resultDescription: callback.ResultDesc,
+    receipt: status === "paid" ? readReceiptFromMetadata(callback.CallbackMetadata) : null,
+  };
+}
+
+function readReceiptFromMetadata(metadata: StkCallbackPayload["Body"]["stkCallback"]["CallbackMetadata"]): string | null {
+  for (const item of metadata?.Item ?? []) {
+    if (item.Name !== "MpesaReceiptNumber") {
+      continue;
+    }
+
+    if (typeof item.Value === "string" && item.Value.trim().length > 0) {
+      return item.Value.trim();
+    }
+
+    if (typeof item.Value === "number") {
+      return String(item.Value);
+    }
+  }
+
+  return null;
 }
 
 function readReceiptFromCallback(raw: unknown): string | null {

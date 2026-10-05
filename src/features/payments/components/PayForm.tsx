@@ -42,18 +42,15 @@ export function PayForm() {
     const deadline = new Date(payment.createdAt).getTime() + CLIENT_WAIT_LIMIT_IN_MS;
 
     const poll = async () => {
-      if (Date.now() >= deadline) {
-        setIsPastWait(true);
-        return;
-      }
-
       const next = await fetchPayment(payment.checkoutRequestId);
       if (!isActive || !next) {
         return;
       }
 
       setPayment(next);
-      if (next.status !== "pending") {
+      if (next.status === "pending" && Date.now() >= deadline) {
+        setIsPastWait(true);
+      } else if (next.status !== "pending") {
         setIsPastWait(false);
       }
     };
@@ -62,9 +59,18 @@ export function PayForm() {
       void poll();
     }, CLIENT_POLL_INTERVAL_IN_MS);
 
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void poll();
+      }
+    };
+
+    document.addEventListener("visibilitychange", checkWhenVisible);
+
     return () => {
       isActive = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
     };
   }, [payment]);
 
