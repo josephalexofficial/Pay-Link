@@ -1,7 +1,7 @@
 export const MINIMUM_AMOUNT_IN_KES = 1;
 export const MAXIMUM_AMOUNT_IN_KES = 150_000;
 
-/** Paybill account reference is limited to 12 characters on Daraja. */
+/** Account reference is limited to 12 characters on Daraja. */
 export const ACCOUNT_REFERENCE = "WHIMSEY";
 
 /** TransactionDesc is limited to 13 characters on Daraja. */

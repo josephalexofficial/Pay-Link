@@ -10,6 +10,7 @@ const mpesaConfigSchema = z.object({
   consumerSecret: z.string().min(1),
   passkey: z.string().min(1),
   shortCode: z.string().regex(/^\d{5,10}$/),
+  tillNumber: z.string().regex(/^\d{5,10}$/),
   callbackUrl: z
     .string()
     .url()
@@ -23,7 +24,7 @@ export type MpesaConfig = z.infer<typeof mpesaConfigSchema>;
 /**
  * Reads Daraja production credentials from the environment.
  *
- * @returns The shortcode, passkey, consumer pair, and public callback URL.
+ * @returns The organization shortcode, Buy Goods till, passkey, consumer pair, and public callback URL.
  *
  * @throws {ConfigurationError} When any required M-Pesa variable is missing or the callback is not https.
  */
@@ -33,6 +34,7 @@ export function getMpesaConfig(): MpesaConfig {
     consumerSecret: process.env.MPESA_CONSUMER_SECRET,
     passkey: process.env.MPESA_PASSKEY,
     shortCode: process.env.MPESA_SHORTCODE ?? "4329875",
+    tillNumber: process.env.MPESA_TILL_NUMBER ?? "4277642",
     callbackUrl: process.env.MPESA_CALLBACK_URL,
   });
 

@@ -70,7 +70,8 @@ On Windows PowerShell, copy the example env file with `Copy-Item .env.example .e
 | `MPESA_CONSUMER_KEY` | Yes | None | Daraja production consumer key. |
 | `MPESA_CONSUMER_SECRET` | Yes | None | Daraja production consumer secret. |
 | `MPESA_PASSKEY` | Yes | None | Lipa na M-Pesa Online passkey. |
-| `MPESA_SHORTCODE` | No | `4329875` | Whimsey Technologies paybill. |
+| `MPESA_SHORTCODE` | No | `4329875` | Organization shortcode on the Daraja app. Used to sign the prompt. |
+| `MPESA_TILL_NUMBER` | No | `4277642` | Buy Goods till that receives the payment. |
 | `MPESA_CALLBACK_URL` | Yes | None | Public https URL ending in `/api/v1/stk-callbacks`. |
 | `AUTH_SECRET` | Yes | None | Secret used to sign the admin session cookie. At least 32 characters. |
 | `ADMIN_EMAIL` | Yes, for seed | None | Admin sign-in email. Used by `npm run db:seed` only. |
