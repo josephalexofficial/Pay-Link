@@ -13,7 +13,6 @@ export default function PayPage() {
       <div className="w-full max-w-[420px]">
         <p className="mb-8 text-center text-xl font-semibold tracking-tight text-brand">Whimsey Technologies</p>
         <PayForm />
-        <p className="mt-8 text-center text-xs tracking-wide text-muted">Paybill 4329875</p>
       </div>
     </main>
   );
