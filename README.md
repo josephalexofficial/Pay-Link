@@ -5,19 +5,19 @@
 ## 1. System Overview and Key Capabilities
 
 - **Pay page:** One screen collects a Safaricom phone number and an amount in Kenyan shillings, then sends an STK prompt.
-- **Result tracking:** Safaricom posts the outcome to a callback. If that callback is late, the server asks Daraja with an STK query.
+- **Result tracking:** Safaricom's callback marks the payment paid and stores the receipt. If that callback is late, the server asks Daraja with an STK query.
 - **Admin:** One signed-in user sees every prompt, the full phone number, the amount, the status, and the M-Pesa receipt.
 
 ## 2. Architecture and Data Flow
 
 ```text
 [Pay page] -> [POST /api/v1/payments] -> [Daraja STK Push] -> [Neon payments row]
-[Safaricom] -> [POST /api/v1/stk-callbacks] -> [store callback]
-[Pay page poll] -> [GET /api/v1/payments/:checkoutRequestId] -> [STK Query when still pending] -> [update row]
+[Safaricom] -> [POST /api/v1/stk-callbacks] -> [store callback and update status]
+[Pay page poll] -> [GET /api/v1/payments/:checkoutRequestId] -> [STK Query only when no callback has arrived]
 [Admin] -> [session cookie] -> [Neon]
 ```
 
-The browser never receives the Daraja consumer secret or passkey. Status changes to paid, cancelled, timed out, or failed only after an STK query confirms the result. The callback is where the M-Pesa receipt is stored.
+The browser never receives the Daraja consumer secret or passkey. A final Safaricom callback marks the payment paid, cancelled, timed out, or failed and stores the M-Pesa receipt. The STK query is only used when that callback has not arrived.
 
 ## 3. Technology Stack
 

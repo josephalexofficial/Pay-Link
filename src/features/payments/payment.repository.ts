@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNotNull, or, sql } from "drizzle-orm";
 
 import { normalizeKenyanPhone } from "@/common/utils/phone";
 import { getDatabase } from "@/db/client";
@@ -137,6 +137,22 @@ export async function updatePaymentByCheckoutRequestId(
     .returning();
 
   return updated[0] ?? null;
+}
+
+/**
+ * Loads pending payments that already have a Safaricom callback saved.
+ *
+ * @returns Up to 50 newest pending rows whose callback can settle the status.
+ */
+export async function findPendingPaymentsWithCallbacks(): Promise<PaymentRecord[]> {
+  const database = getDatabase();
+
+  return database
+    .select()
+    .from(payments)
+    .where(and(eq(payments.status, "pending"), isNotNull(payments.rawCallback)))
+    .orderBy(desc(payments.createdAt))
+    .limit(50);
 }
 
 /**

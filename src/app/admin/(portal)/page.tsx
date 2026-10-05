@@ -6,6 +6,7 @@ import { formatAmountInKes } from "@/common/utils/money";
 import { formatKenyanPhoneForDisplay } from "@/common/utils/phone";
 import { formatNairobiDateTime, getNairobiDayStart, getNairobiMonthStart } from "@/common/utils/nairobi-time";
 import { listPayments, summarizePayments, type PaymentSummary } from "@/features/payments/payment.repository";
+import { settlePendingCallbacks } from "@/features/payments/payment.service";
 import { PAYMENT_STATUSES, type PaymentStatus } from "@/features/payments/payment.constants";
 import { parsePaymentListParams } from "@/features/payments/payment.schema";
 import type { PaymentRecord } from "@/db/schema";
@@ -34,6 +35,7 @@ export default async function AdminHomePage({
   let loadError: "configuration" | "unavailable" | null = null;
 
   try {
+    await settlePendingCallbacks(now);
     const [summaryResult, list] = await Promise.all([
       summarizePayments(getNairobiDayStart(now), getNairobiMonthStart(now)),
       listPayments(listQuery),

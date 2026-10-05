@@ -5,6 +5,7 @@
 ### Fixed
 
 - STK prompts now use Buy Goods till 4277642. Paybill-style requests were rejected by Safaricom with result code 2029.
+- A successful Safaricom callback now marks the payment paid and stores the receipt. The pay page checks again when the customer returns from the PIN screen.
 
 ### Added
 
