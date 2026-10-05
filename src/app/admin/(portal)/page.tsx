@@ -114,7 +114,7 @@ function FilterForm({ searchText, status }: { searchText: string; status: Paymen
       <input
         name="q"
         defaultValue={searchText}
-        placeholder="Name, phone, or receipt"
+        placeholder="Phone or receipt"
         className="h-12 flex-1 rounded-xl border border-line bg-card px-4 text-sm outline-none transition duration-300 focus:border-brand focus:ring-4 focus:ring-brand/10"
       />
       <select
@@ -152,7 +152,6 @@ function PaymentList({ payments }: { payments: PaymentRecord[] }) {
           <thead className="border-b border-line text-xs text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">Time</th>
-              <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Phone</th>
               <th className="px-4 py-3 font-medium">Amount</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -164,7 +163,6 @@ function PaymentList({ payments }: { payments: PaymentRecord[] }) {
             {payments.map((payment) => (
               <tr key={payment.id} className="border-b border-line last:border-b-0">
                 <td className="px-4 py-3 whitespace-nowrap">{formatNairobiDateTime(payment.createdAt)}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{payment.customerName ?? "Not recorded"}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatKenyanPhoneForDisplay(payment.phoneNumber)}</td>
                 <td className="px-4 py-3 whitespace-nowrap">{formatAmountInKes(payment.amountInKes)}</td>
                 <td className="px-4 py-3">
@@ -183,8 +181,7 @@ function PaymentList({ payments }: { payments: PaymentRecord[] }) {
           <article key={payment.id} className="rounded-2xl border border-line bg-card px-4 py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium">{payment.customerName ?? "Not recorded"}</p>
-                <p className="mt-1 text-sm">{formatKenyanPhoneForDisplay(payment.phoneNumber)}</p>
+                <p className="font-medium">{formatKenyanPhoneForDisplay(payment.phoneNumber)}</p>
                 <p className="mt-1 text-xs text-muted">{formatNairobiDateTime(payment.createdAt)}</p>
               </div>
               <StatusPill status={readStatus(payment.status)} />
