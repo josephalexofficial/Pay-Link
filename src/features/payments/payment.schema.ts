@@ -55,6 +55,28 @@ export const stkCallbackSchema = z.object({
 
 export type StkCallbackPayload = z.infer<typeof stkCallbackSchema>;
 
+export const payerConfirmationSchema = z.object({
+  TransID: z.string().trim().min(1).optional(),
+  TransAmount: z.union([z.string(), z.number()]).optional(),
+  MSISDN: z.union([z.string(), z.number()]).optional(),
+  FirstName: z.string().optional(),
+  MiddleName: z.string().optional(),
+  LastName: z.string().optional(),
+});
+
+export type PayerConfirmation = z.infer<typeof payerConfirmationSchema>;
+
+/**
+ * Reads the payer name Safaricom posts after money has moved.
+ *
+ * @param payload - Raw confirmation JSON.
+ * @returns The typed confirmation, or null when the body is not a confirmation.
+ */
+export function parsePayerConfirmation(payload: unknown): PayerConfirmation | null {
+  const parsed = payerConfirmationSchema.safeParse(payload);
+  return parsed.success ? parsed.data : null;
+}
+
 /**
  * Parses an unknown JSON body into a payment request.
  *
@@ -89,8 +111,8 @@ export function parseStkCallback(payload: unknown): StkCallbackPayload {
   return parsed.data;
 }
 
-export function validationErrorFromZod(error: z.ZodError): ValidationError {
-  return new ValidationError("Check the phone number and amount.", {
+export function validationErrorFromZod(error: z.ZodError, message = "Check the phone number and amount."): ValidationError {
+  return new ValidationError(message, {
     details: error.issues.map((issue) => ({
       field: issue.path.join(".") || "request",
       issue: issue.message,

@@ -15,6 +15,7 @@ export const payments = pgTable(
     merchantRequestId: text("merchant_request_id").notNull(),
     checkoutRequestId: text("checkout_request_id").notNull().unique(),
     phoneNumber: text("phone_number").notNull(),
+    customerName: text("customer_name"),
     amountInKes: integer("amount_in_kes").notNull(),
     accountReference: text("account_reference").notNull(),
     transactionDescription: text("transaction_description").notNull(),
